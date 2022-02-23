@@ -5,7 +5,7 @@ preRun:
         - yarn install
 preMerge:
   pattern:
-    - "__tests__/*/*.spec.tsx""
+    - "__tests__/*/*.spec.tsx"
 postMerge:
   pattern: 
     - "__tests__/*/*.spec.tsx"
