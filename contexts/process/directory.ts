@@ -53,6 +53,16 @@ const processDirectory: Processes = {
     icon: FOLDER_ICON,
     title: "File Explorer",
   },
+  IRC: {
+    Component: dynamic(() => import("components/apps/IRC")),
+    background: "#000",
+    defaultSize: {
+      height: 480,
+      width: 640,
+    },
+    icon: "/System/Icons/irc.png",
+    title: "IRC",
+  },
   JSDOS: {
     Component: dynamic(() => import("components/apps/JSDOS")),
     autoSizing: true,
@@ -64,6 +74,16 @@ const processDirectory: Processes = {
     icon: "/System/Icons/jsdos.png",
     lockAspectRatio: true,
     title: "js-dos v7",
+  },
+  Marked: {
+    Component: dynamic(() => import("components/apps/Marked")),
+    background: "#FFF",
+    defaultSize: {
+      height: 480,
+      width: 560,
+    },
+    icon: "/System/Icons/marked.png",
+    title: "Marked",
   },
   MonacoEditor: {
     Component: dynamic(() => import("components/apps/MonacoEditor")),

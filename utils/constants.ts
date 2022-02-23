@@ -11,12 +11,14 @@ export const DEFAULT_THEME = "defaultTheme";
 
 export const DEFAULT_WINDOW_SIZE: Size = {
   height: 300,
-  width: 320,
+  width: 388,
 };
 
 export const EMPTY_BUFFER = Buffer.from("");
 
 export const FOCUSABLE_ELEMENT = { tabIndex: -1 };
+
+export const FS_HANDLES = "FileSystemAccessHandles";
 
 export const HOME = "/Users/Public";
 
@@ -119,3 +121,5 @@ export const NEW_FOLDER_ICON = `${ICON_PATH}/new_folder.png`;
 export const UNKNOWN_ICON = `${ICON_PATH}/unknown.png`;
 
 export const DEFAULT_SCROLLBAR_WIDTH = 17;
+
+export const TASKBAR_HEIGHT = 30;

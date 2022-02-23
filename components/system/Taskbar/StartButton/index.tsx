@@ -1,5 +1,5 @@
+import StartButtonIcon from "components/system/Taskbar/StartButton/StartButtonIcon";
 import StyledStartButton from "components/system/Taskbar/StartButton/StyledStartButton";
-import WindowsIcon from "components/system/Taskbar/StartButton/WindowsIcon";
 
 type StartButtonProps = {
   startMenuVisible: boolean;
@@ -15,7 +15,7 @@ const StartButton = ({
     onClick={() => toggleStartMenu()}
     title="Start"
   >
-    <WindowsIcon />
+    <StartButtonIcon />
   </StyledStartButton>
 );
 

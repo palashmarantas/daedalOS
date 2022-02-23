@@ -22,7 +22,7 @@ const StatusBar = ({ id }: ComponentProcessProps): JSX.Element => {
   useEffect(() => {
     const updatePosition = (): void => {
       const selection = editor?.getSelection();
-      const { positionColumn, positionLineNumber } = selection || {};
+      const { positionColumn = 0, positionLineNumber = 0 } = selection || {};
       const selectedText = selection
         ? editor?.getModel()?.getValueInRange(selection)
         : "";
@@ -37,7 +37,7 @@ const StatusBar = ({ id }: ComponentProcessProps): JSX.Element => {
       setLineCount(editor?.getModel()?.getLineCount() || 0);
     const updateModel = (): void => {
       const model = editor?.getModel() as Model;
-      const { language: modelLanguage } = model?.getLanguageIdentifier() || {};
+      const modelLanguage = model?.getLanguageId();
 
       if (modelLanguage) {
         setLanguage(

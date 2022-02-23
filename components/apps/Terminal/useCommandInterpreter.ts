@@ -1,3 +1,4 @@
+import { colorAttributes, rgbAnsi } from "components/apps/Terminal/color";
 import {
   aliases,
   autoComplete,
@@ -20,15 +21,25 @@ import {
 } from "components/apps/Terminal/useTerminal";
 import type { ExtensionType } from "components/system/Files/FileEntry/extensions";
 import extensions from "components/system/Files/FileEntry/extensions";
-import { getModifiedTime } from "components/system/Files/FileEntry/functions";
+import {
+  getModifiedTime,
+  getProcessByFileExtension,
+} from "components/system/Files/FileEntry/functions";
 import { useFileSystem } from "contexts/fileSystem";
 import { useProcesses } from "contexts/process";
 import processDirectory from "contexts/process/directory";
 import { basename, dirname, extname, isAbsolute, join } from "path";
 import { useCallback, useEffect, useRef } from "react";
 import { EMPTY_BUFFER, HOME, ONE_DAY_IN_MILLISECONDS } from "utils/constants";
+import { transcode } from "utils/ffmpeg";
 import { getTZOffsetISOString } from "utils/functions";
+import { convert } from "utils/imagemagick";
+import { fullSearch } from "utils/search";
 import type { Terminal } from "xterm";
+
+const FILE_NOT_FILE = "The system cannot find the file specified.";
+const PATH_NOT_FOUND = "The system cannot find the path specified.";
+const SYNTAX_ERROR = "The syntax of the command is incorrect.";
 
 const useCommandInterpreter = (
   id: string,
@@ -45,6 +56,7 @@ const useCommandInterpreter = (
     readFile,
     rename,
     resetStorage,
+    rootFs,
     stat,
     updateFolder,
     writeFile,
@@ -60,7 +72,7 @@ const useCommandInterpreter = (
 
     return isAbsolute(file) ? file : join(cd.current, file);
   };
-
+  const colorOutput = useRef<string[]>([]);
   const updateFile = useCallback(
     (filePath: string, isDeleted = false): void => {
       const dirPath = dirname(filePath);
@@ -97,10 +109,10 @@ const useCommandInterpreter = (
                 localEcho?.println((await readFile(fullPath)).toString());
               }
             } else {
-              localEcho?.println("The system cannot find the path specified.");
+              localEcho?.println(PATH_NOT_FOUND);
             }
           } else {
-            localEcho?.println("The syntax of the command is incorrect.");
+            localEcho?.println(SYNTAX_ERROR);
           }
           break;
         }
@@ -122,10 +134,52 @@ const useCommandInterpreter = (
                 );
               }
             } else {
-              localEcho?.println("The system cannot find the path specified.");
+              localEcho?.println(PATH_NOT_FOUND);
             }
           } else {
             localEcho?.println(cd.current);
+          }
+          break;
+        }
+        case "color": {
+          const [r, g, b] = commandArgs;
+
+          if (
+            typeof r !== "undefined" &&
+            typeof g !== "undefined" &&
+            typeof b !== "undefined"
+          ) {
+            localEcho?.print(rgbAnsi(Number(r), Number(g), Number(b)));
+          } else {
+            const [[bg, fg] = []] = commandArgs;
+            const { rgb: bgRgb, name: bgName } =
+              colorAttributes[bg?.toUpperCase()] || {};
+            const { rgb: fgRgb, name: fgName } =
+              colorAttributes[fg?.toUpperCase()] || {};
+
+            if (bgRgb) {
+              const useAsBg = Boolean(fgRgb);
+              const bgAnsi = rgbAnsi(...bgRgb, useAsBg);
+
+              localEcho?.print(bgAnsi);
+              localEcho?.println(
+                `${useAsBg ? "Background" : "Foreground"}: ${bgName}`
+              );
+              colorOutput.current[0] = bgAnsi;
+            }
+
+            if (fgRgb) {
+              const fgAnsi = rgbAnsi(...fgRgb);
+
+              localEcho?.print(fgAnsi);
+              localEcho?.println(`Foreground: ${fgName}`);
+              colorOutput.current[1] = fgAnsi;
+            }
+
+            if (!fgRgb && !bgRgb) {
+              localEcho?.print("\u001B[0m");
+              colorOutput.current = [];
+            }
           }
           break;
         }
@@ -149,14 +203,14 @@ const useCommandInterpreter = (
               localEcho?.println("\t0 file(s) copied.");
             }
           } else {
-            localEcho?.println("The system cannot find the file specified.");
+            localEcho?.println(FILE_NOT_FILE);
           }
           break;
         }
         case "clear":
         case "cls":
           terminal?.reset();
-          terminal?.write("\u001Bc");
+          terminal?.write(`\u001Bc${colorOutput.current.join("")}`);
           break;
         case "date": {
           localEcho?.println(
@@ -259,6 +313,48 @@ const useCommandInterpreter = (
         case "quit":
           closeWithTransition(id);
           break;
+        case "find": {
+          const results = await fullSearch(
+            commandArgs.join(" "),
+            readFile,
+            rootFs
+          );
+          results?.forEach(({ ref }) => localEcho?.println(ref));
+          break;
+        }
+        case "ffmpeg":
+        case "imagemagick": {
+          const [file, format] = commandArgs;
+
+          if (file && format) {
+            const fullPath = getFullPath(file);
+
+            if (
+              (await exists(fullPath)) &&
+              !(await stat(fullPath)).isDirectory()
+            ) {
+              const convertOrTranscode =
+                lcBaseCommand === "ffmpeg" ? transcode : convert;
+              const [[newName, newData]] = await convertOrTranscode(
+                [[basename(fullPath), await readFile(fullPath)]],
+                format,
+                localEcho
+              );
+
+              if (newName && newData) {
+                const newPath = join(dirname(fullPath), newName);
+
+                await writeFile(newPath, newData);
+                updateFile(newPath);
+              }
+            } else {
+              localEcho?.println(FILE_NOT_FILE);
+            }
+          } else {
+            localEcho?.println(SYNTAX_ERROR);
+          }
+          break;
+        }
         case "git": {
           if (fs && localEcho) {
             await processGit(
@@ -348,10 +444,10 @@ const useCommandInterpreter = (
               updateFile(fullSourcePath, true);
               updateFile(fullDestinationPath);
             } else {
-              localEcho?.println("The syntax of the command is incorrect.");
+              localEcho?.println(SYNTAX_ERROR);
             }
           } else {
-            localEcho?.println("The system cannot find the file specified.");
+            localEcho?.println(FILE_NOT_FILE);
           }
           break;
         }
@@ -473,12 +569,16 @@ const useCommandInterpreter = (
               ).toLowerCase() as ExtensionType;
 
               if (
-                extensions[fileExtension].process.includes("Terminal") &&
-                extensions[fileExtension].command
+                extensions[fileExtension]?.process.includes("Terminal") &&
+                extensions[fileExtension]?.command
               ) {
                 await commandInterpreter(
                   `${extensions[fileExtension].command} ${baseCommand}`
                 );
+              } else {
+                const basePid = getProcessByFileExtension(fileExtension);
+
+                if (basePid) open(basePid, { url: baseCommand });
               }
             } else {
               localEcho?.println(unknownCommand(baseCommand));
@@ -503,6 +603,7 @@ const useCommandInterpreter = (
       readdir,
       rename,
       resetStorage,
+      rootFs,
       stat,
       terminal,
       updateFile,

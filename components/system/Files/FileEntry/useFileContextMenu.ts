@@ -21,6 +21,17 @@ import {
   MOUNTABLE_EXTENSIONS,
   SHORTCUT_EXTENSION,
 } from "utils/constants";
+import { transcode } from "utils/ffmpeg";
+import {
+  AUDIO_DECODE_FORMATS,
+  AUDIO_ENCODE_FORMATS,
+  VIDEO_DECODE_FORMATS,
+  VIDEO_ENCODE_FORMATS,
+} from "utils/ffmpeg/formats";
+import type { FFmpegTranscodeFile } from "utils/ffmpeg/types";
+import { convert } from "utils/imagemagick";
+import { IMAGE_ENCODE_FORMATS } from "utils/imagemagick/formats";
+import type { ImageMagickConvertFile } from "utils/imagemagick/types";
 
 const useFileContextMenu = (
   url: string,
@@ -44,7 +55,16 @@ const useFileContextMenu = (
   const baseName = basename(path);
   const isFocusedEntry = focusedEntries.includes(baseName);
   const openFile = useFile(url);
-  const { copyEntries, moveEntries, rootFs, stat } = useFileSystem();
+  const {
+    copyEntries,
+    moveEntries,
+    readFile,
+    rootFs,
+    stat,
+    unMapFs,
+    updateFolder,
+    writeFile,
+  } = useFileSystem();
   const { contextMenu } = useMenu();
   const getItems = useCallback(() => {
     const urlExtension = extname(url).toLowerCase();
@@ -118,6 +138,61 @@ const useFileContextMenu = (
           });
         }
 
+        const canDecodeAudio = AUDIO_DECODE_FORMATS.has(pathExtension);
+        const canDecodeImage = IMAGE_FILE_EXTENSIONS.has(pathExtension);
+        const canDecodeVideo = VIDEO_DECODE_FORMATS.has(pathExtension);
+
+        if (canDecodeAudio || canDecodeImage || canDecodeVideo) {
+          const isAudioVideo = canDecodeAudio || canDecodeVideo;
+          const ENCODE_FORMATS = isAudioVideo
+            ? canDecodeAudio
+              ? AUDIO_ENCODE_FORMATS
+              : VIDEO_ENCODE_FORMATS
+            : IMAGE_ENCODE_FORMATS;
+
+          menuItems.unshift(MENU_SEPERATOR, {
+            label: "Convert to",
+            menu: ENCODE_FORMATS.filter(
+              (format) => format !== pathExtension
+            ).map((format) => {
+              const transcodeFunction = isAudioVideo ? transcode : convert;
+              const extension = format.replace(".", "");
+
+              return {
+                action: async () => {
+                  const transcodeFiles: (
+                    | FFmpegTranscodeFile
+                    | ImageMagickConvertFile
+                  )[] = await Promise.all(
+                    absoluteEntries().map(async (absoluteEntry) => [
+                      absoluteEntry,
+                      await readFile(absoluteEntry),
+                    ])
+                  );
+
+                  const transcodedFiles = await transcodeFunction(
+                    transcodeFiles,
+                    extension
+                  );
+
+                  await Promise.all(
+                    transcodedFiles.map(
+                      async ([transcodedFileName, transcodedFileData]) => {
+                        writeFile(transcodedFileName, transcodedFileData);
+                        updateFolder(
+                          dirname(path),
+                          basename(transcodedFileName)
+                        );
+                      }
+                    )
+                  );
+                },
+                label: extension.toUpperCase(),
+              };
+            }),
+          });
+        }
+
         menuItems.unshift(
           {
             action: () => archiveFiles(absoluteEntries()),
@@ -159,6 +234,13 @@ const useFileContextMenu = (
       }
 
       menuItems.unshift(MENU_SEPERATOR);
+    }
+
+    if (remoteMount) {
+      menuItems.push(MENU_SEPERATOR, {
+        action: () => unMapFs(path),
+        label: "Disconnect",
+      });
     }
 
     if (!pid && openWithFiltered.length === 0) {
@@ -242,20 +324,24 @@ const useFileContextMenu = (
     openFile,
     path,
     pid,
+    readFile,
     readOnly,
     rootFs?.mntMap,
     rootFs?.mountList,
     setRenaming,
     setWallpaper,
     stat,
+    unMapFs,
+    updateFolder,
     url,
+    writeFile,
   ]);
 
   const { onContextMenuCapture, ...contextMenuHandlers } =
     contextMenu?.(getItems) || {};
 
   return {
-    onContextMenuCapture: (event: React.MouseEvent | React.TouchEvent) => {
+    onContextMenuCapture: (event?: React.MouseEvent | React.TouchEvent) => {
       if (!isFocusedEntry) {
         blurEntry();
         focusEntry(baseName);

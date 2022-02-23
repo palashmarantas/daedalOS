@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 
 const useWorker = <T>(
   workerFunction: string | (() => void),
-  onMessage: (message: { data: T }) => void
-): void => {
+  name: string,
+  onMessage?: (message: { data: T }) => void
+): Worker | undefined => {
   const [worker, setWorker] = useState<Worker>();
 
   useEffect(() => {
@@ -16,14 +17,17 @@ const useWorker = <T>(
         })
       );
 
-      setWorker(new Worker(workerUrl));
+      setWorker(new Worker(workerUrl, { name }));
 
       URL.revokeObjectURL?.(workerUrl);
     }
-  }, [workerFunction]);
+  }, [name, workerFunction]);
 
   useEffect(() => {
-    worker?.addEventListener("message", onMessage, { passive: true });
+    if (onMessage) {
+      worker?.addEventListener("message", onMessage, { passive: true });
+    }
+
     worker?.postMessage("init");
 
     return () => {
@@ -34,6 +38,8 @@ const useWorker = <T>(
       }
     };
   }, [onMessage, worker]);
+
+  return worker;
 };
 
 export default useWorker;
