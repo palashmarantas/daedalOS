@@ -5,11 +5,12 @@ preRun:
         - yarn install
 preMerge:
   pattern:
-    - "./__tests__/utils/functions.spec.tsx"
+    - "__tests__/*/*.spec.tsx""
 postMerge:
   pattern: 
-    - "./__tests__/utils/functions.spec.tsx"
+    - "__tests__/*/*.spec.tsx"
 postRun:
      command:
         - yarn --version
+configFile: jest.config.js
 version: 1.0 
