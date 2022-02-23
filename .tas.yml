@@ -5,11 +5,9 @@ preRun:
         - yarn install
 preMerge:
   pattern:
-    - "./__tests__/pages/index.spec.tsx"
     - "./__tests__/utils/functions.spec.tsx"
 postMerge:
   pattern: 
-    - "./__tests__/pages/index.spec.tsx"
     - "./__tests__/utils/functions.spec.tsx"
 postRun:
      command:
