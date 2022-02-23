@@ -1,13 +1,14 @@
+---
 framework: jest
-postMerge:
-  pattern: 
-    - "__tests__/*/*.spec.tsx"
-preMerge:
-  pattern:
-    - "__tests__/*/*.spec.tsx"
 preRun:
      command:
         - yarn install
+preMerge:
+  pattern:
+    - "__tests__/*/*.spec.tsx"
+postMerge:
+  pattern: 
+    - "__tests__/*/*.spec.tsx"
 postRun:
      command:
         - yarn --version
