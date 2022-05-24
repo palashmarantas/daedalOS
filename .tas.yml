@@ -2,8 +2,8 @@
 framework: jest
 preRun:
      command:
-        - yarn
-        - yarn build
+        - yarn install
+        - yarn run build
 preMerge:
   pattern:
     - "__tests__/*/*.spec.tsx"
